@@ -1,137 +1,115 @@
-# 🚨 Netra AI – Smart Face Recognition & Emergency Assistant
+# Netra AI Vision Assistance System
 
-**Netra AI** is a Raspberry Pi-based intelligent assistant designed for real-time **face recognition**, **Gemini AI-based scene analysis**, and **emergency alert handling** via physical buttons. It’s a modular and scalable project designed to help users in critical situations with voice feedback.
-
----
-
-## 💡 Features
-
-- **Button A (GPIO 17)** – Capture face and train model.
-- **Button B (GPIO 18)** – Toggle real-time face recognition.
-- **Button C (GPIO 22)** – Capture image and describe it using Gemini AI.
-- **Button D (GPIO 23)**  
-  - **Short press** – Record a video and describe the scene via Gemini AI.  
-  - **Long press (≥ 3 sec)** – Send emergency alert to backend (Node.js + Twilio) via HTTP.
-
-All responses are given through **Bluetooth-connected speaker** using **gTTS text-to-speech**.
-
----
-
-## 🧠 Technologies Used
-
-- Raspberry Pi GPIO (Button interfacing)
-- Python
-- Node.js (Twilio SMS backend)
-- gTTS + mpg123 (for speech output)
-- Gemini 1.5 Pro (Image/Video analysis)
-- OpenCV (Face recognition pipeline)
-- Twilio (SMS Alerts)
-
----
-
-## 📁 Folder Structure
-
+## Complete Project Structure
 ```
-netra_ai/
-├── main.py
-├── config.py
-├── buttons/
-│   ├── button_a.py               # Face capture + training
-│   ├── button_b.py               # Toggle recognition
-│   ├── button_c.py               # Gemini image describer
-│   ├── button_d.py               # Gemini video + Emergency trigger
-├── utils/
-│   ├── tts.py                    # gTTS-based voice module
-│   ├── emergency.py             # HTTP trigger for SMS backend
-├── gemini/
-│   ├── gemini_image_describer.py  # Describe image using Gemini
-│   ├── gemini_video_describer.py  # Describe video using Gemini
-├── sms-backend/                 # Node.js Twilio SMS backend
-│   ├── index.js
-│   ├── .env
-│   ├── package.json
-│   └── README.md
-├── README.md                    # Project Documentation
+netra-ai/
+├── buttons/               # Button handler modules
+│   ├── button_a.py        # Face capture & training
+│   ├── button_b.py        # Recognition toggle
+│   ├── button_c.py        # Image description
+│   └── button_d.py        # Emergency/Videodescription
+├── gemini/                # AI integration
+│   ├── gemini_image_describer.py
+│   └── gemini_video_describer.py
+├── utils/                 # Utility modules
+│   ├── tts.py             # Text-to-speech
+│   └── emergency.py       # SMS alert handling
+├── sms-backend/           # Node.js SMS service
+│   ├── index.js           # SMS server
+│   ├── package.json       # Dependencies
+│   ├── package-lock.json
+│   └── README.md          # SMS specific docs
+├── main.py                # Main application
+├── config.py              # Configuration
+├── requirements.txt       # Python dependencies
+└── README.md              # This document
 ```
 
----
+## SMS Backend Service
 
-## ⚙️ Setup Instructions (Raspberry Pi)
+### Key Features
+- Twilio integration for emergency SMS
+- Rate limiting (max 1 alert every 30 minutes)
+- Location data support
+- Multiple emergency contacts
 
-### 1. Install Python dependencies:
+### Setup Instructions
+1. Install Node.js v16+:
 ```bash
-sudo apt update
-sudo apt install mpg123
-pip install gTTS RPi.GPIO requests
+curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+sudo apt install nodejs
 ```
 
-### 2. Prepare face recognition module:
-Place your script `face_rec.py` that supports:
-- `python3 face_rec.py capture`
-- `python3 face_rec.py train`
-- `python3 face_rec.py recognize`
-
-### 3. Add Gemini AI scripts:
-Place these inside `gemini/` directory:
-- `gemini_image_describer.py`
-- `gemini_video_describer.py`
-
-### 4. Run the main controller:
+2. Configure SMS service:
 ```bash
-python3 main.py
-```
-
----
-
-## 📡 Setup for Emergency SMS Backend
-
-### 1. Go to `sms-backend/` folder:
-```bash
-cd sms-backend/
-```
-
-### 2. Install dependencies:
-```bash
+cd sms-backend
 npm install
+cp .env.example .env
 ```
 
-### 3. Create `.env` file with Twilio keys:
-```
-ACCOUNT_SID=your_twilio_account_sid
-AUTH_TOKEN=your_twilio_auth_token
-FROM_NUMBER=+1234567890        # Twilio verified number
-TO_NUMBER=+9198XXXXXXXX        # Emergency receiver number
-DEFAULT_MESSAGE=URGENT: I need help immediately...
+3. Edit `.env` with your:
+```env
+TWILIO_ACCOUNT_SID=your_sid
+TWILIO_AUTH_TOKEN=your_token
+TWILIO_PHONE_NUMBER=+123456789
+EMERGENCY_CONTACTS=+15555555555,+16666666666
 ```
 
-### 4. Start backend server:
+4. Start the service:
 ```bash
 node index.js
 ```
 
-### 5. Update the Raspberry Pi config:
-In `config.py`, set:
-```python
-EMERGENCY_ENDPOINT = "http://<your_pi_ip>:3000/data"
+## Main System Installation
+
+### Hardware Requirements
+- Raspberry Pi 4 (recommended)
+- USB Webcam
+- 4x Tactile buttons
+- Audio output device
+- SIM card module (for SMS)
+
+### Software Setup
+```bash
+# Install dependencies
+sudo apt update
+sudo apt install python3-pip mpg123 python3-opencv
+
+# Python packages
+pip install -r requirements.txt
+
+# Set environment variables
+echo "export GEMINI_API_KEY='your_api_key'" >> ~/.bashrc
+echo "export EMERGENCY_SMS_ENDPOINT='http://your-server:3000/alert'" >> ~/.bashrc
+source ~/.bashrc
 ```
 
----
+## Running the System
+1. Start SMS backend (separate terminal):
+```bash
+cd sms-backend && node index.js
+```
 
-## 🧪 Test Your Setup
+2. Start main application:
+```bash
+python main.py
+```
 
-- ✅ Press **Button A** → Face capture & training  
-- ✅ Press **Button B** → Toggle face recognition (gives voice feedback)  
-- ✅ Press **Button C** → Captures image, describes with Gemini  
-- ✅ Press **Button D (short)** → Records short video, analyzes with Gemini  
-- ✅ Press **Button D (long)** → Sends emergency alert via Twilio  
+## Troubleshooting Guide
 
----
 
-## 📌 Notes
+### Camera Problems
+```bash
+# Verify camera detection
+ls /dev/video*
+# Test camera capture
+raspistill -v -o test.jpg
+```
 
-- Ensure your buttons are connected properly on the GPIO pins.
-- Bluetooth speaker must be paired before running `main.py`.
-- Twilio trial accounts require verified phone numbers.
-- Gemini API usage is simulated unless fully implemented with API credentials.
-
----
+### Audio Issues
+```bash
+# Test audio playback
+speaker-test -t wav -c 2
+# Check mpg123 installation
+which mpg123
+```

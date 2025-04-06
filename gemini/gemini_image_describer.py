@@ -10,10 +10,10 @@ import tempfile
 from io import BytesIO
 from gtts import gTTS
 
-##########################
-# 1) Gemini & TTS Config
-##########################
-GEMINI_API_KEY = ""  # Replace with your real key
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")  # Get from environment variable
+if not GEMINI_API_KEY:
+    print("Error: GEMINI_API_KEY environment variable not set")
+    exit(1)
 GEMINI_API_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key="
     + GEMINI_API_KEY
@@ -54,41 +54,58 @@ def capture_image():
     
     return base64_image
 
-def send_to_gemini_api(base64_image):
+def send_to_gemini_api(base64_image, max_retries=3):
     """
-    Send the base64-encoded image to the Gemini endpoint and return the text description.
+    Send the base64-encoded image to the Gemini endpoint with retry logic.
+    Returns the text description or error message.
     """
-    # Build the JSON payload
-    payload = {
-        "contents": [{
-            "parts": [
-                {"text": "Describe this image in short"},  # Prompt
-                {
-                    "inlineData": {
-                        "mimeType": "image/jpeg",
-                        "data": base64_image
-                    }
-                }
-            ]
-        }]
-    }
-    
-    headers = {"Content-Type": "application/json"}
-    response = requests.post(GEMINI_API_URL, json=payload, headers=headers)
-    
-    if response.status_code == 200:
-        response_json = response.json()
-        # Parse the nested structure
-        candidates = response_json.get("candidates", [])
-        if candidates:
-            content = candidates[0].get("content", {})
-            parts = content.get("parts", [])
-            if parts:
-                return parts[0].get("text", "No description available.")
-        return "No candidates found."
-    else:
-        print("Error from Gemini API:", response.text)
-        return "Failed to get response from Gemini."
+    for attempt in range(max_retries):
+        try:
+            # Build the JSON payload
+            payload = {
+                "contents": [{
+                    "parts": [
+                        {"text": "Describe this image in short"},
+                        {
+                            "inlineData": {
+                                "mimeType": "image/jpeg",
+                                "data": base64_image
+                            }
+                        }
+                    ]
+                }]
+            }
+            
+            headers = {"Content-Type": "application/json"}
+            response = requests.post(GEMINI_API_URL, json=payload, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                response_json = response.json()
+                candidates = response_json.get("candidates", [])
+                if candidates:
+                    content = candidates[0].get("content", {})
+                    parts = content.get("parts", [])
+                    if parts:
+                        return parts[0].get("text", "No description available.")
+                return "No candidates found."
+            
+            elif response.status_code >= 500:
+                print(f"Server error (attempt {attempt + 1}/{max_retries}): {response.text}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                continue
+                
+            else:
+                print(f"API error: {response.text}")
+                return "Failed to get response from Gemini."
+
+        except requests.exceptions.RequestException as e:
+            print(f"Request failed (attempt {attempt + 1}/{max_retries}): {str(e)}")
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)  # Exponential backoff
+            continue
+
+    return "Failed to get response after multiple attempts."
 
 def play_tts(text):
     """
